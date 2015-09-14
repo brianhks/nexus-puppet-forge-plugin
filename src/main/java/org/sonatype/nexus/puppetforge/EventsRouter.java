@@ -27,6 +27,11 @@ public class EventsRouter
 	public EventsRouter(final Provider<RepositoryRegistry> repositoryRegistryProvider,
 			final EventBus eventBus)
 	{
+		//This is interesting
+		//if (request.isExternal() && getRepositoryKind().isFacetAvailable(MavenHostedRepository.class)) {
+
+		//AbstractMavenRepository.recreateMavenMetadata() copy this stuff
+
 		m_repositoryRegistryProvider = checkNotNull(repositoryRegistryProvider);
 		checkNotNull(eventBus).register(this);
 	}
