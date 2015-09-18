@@ -39,13 +39,13 @@ public class UserResource extends ApplicationSupport
 				"  },\n" +
 				"  \"results\": [\n" +
 				"    {\n" +
-				"      \"uri\": \"/v3/users/001john\",\n" +
-				"      \"slug\": \"001john\",\n" +
+				"      \"uri\": \"/v3/users/ZeroWing\",\n" +
+				"      \"slug\": \"ZeroWing\",\n" +
 				"      \"gravatar_id\": \"4dbab6720a744e44beb0999266bfe6a2\",\n" +
-				"      \"username\": \"001john\",\n" +
-				"      \"display_name\": \"001john\",\n" +
-				"      \"release_count\": 0,\n" +
-				"      \"module_count\": 0,\n" +
+				"      \"username\": \"ZeroWing\",\n" +
+				"      \"display_name\": \"ZeroWing\",\n" +
+				"      \"release_count\": 1,\n" +
+				"      \"module_count\": 1,\n" +
 				"      \"created_at\": \"2014-11-06 06:33:31 -0800\",\n" +
 				"      \"updated_at\": \"2014-11-06 06:33:53 -0800\"\n" +
 				"    }" +

@@ -3,6 +3,15 @@ package org.sonatype.nexus.puppetforge.rest;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
+import com.google.inject.Inject;
+import org.apache.maven.artifact.repository.metadata.Metadata;
+import org.sonatype.nexus.proxy.maven.ArtifactStoreRequest;
+import org.sonatype.nexus.proxy.maven.MavenHostedRepository;
+import org.sonatype.nexus.proxy.maven.MavenRepository;
+import org.sonatype.nexus.proxy.maven.MetadataLocator;
+import org.sonatype.nexus.proxy.maven.gav.Gav;
+import org.sonatype.nexus.proxy.registry.RepositoryRegistry;
+import org.sonatype.nexus.proxy.repository.Repository;
 import org.sonatype.nexus.puppetforge.PuppetForgePlugin;
 import org.sonatype.sisu.siesta.common.Resource;
 import org.sonatype.sisu.siesta.server.ApplicationSupport;
@@ -29,31 +38,19 @@ import java.util.Map;
 public class ModuleResource extends ApplicationSupport
 	implements Resource
 {
-	private Multimap<String, String> m_artifactMap;
+	private RepositoryRegistry m_repositoryRegistry;
+	private MetadataLocator m_metadataLocator;
 
-	public ModuleResource()
+	@Inject
+	public ModuleResource(RepositoryRegistry repositoryRegistry,
+			MetadataLocator metadataLocator)
 	{
-		//log.debug("++++++++++HERE+++++++++++++++++");
-		m_artifactMap = TreeMultimap.create();
-
-		m_artifactMap.put("puppetlabs-mysql", "3.4.0");
-		m_artifactMap.put("nanliu-staging", "1.0.3");
-		m_artifactMap.put("puppetlabs-stdlib", "4.6.0");
+		//log.info("++++++++++HERE+++++++++++++++++");
+		m_repositoryRegistry = repositoryRegistry;
+		m_metadataLocator = metadataLocator;
 	}
 	/**
-	 Needs to return something like
-	 {
-	   "releases": [
-	 {
-	   "version": "2.3.4"
-	 },
-	 {
-	   "version": 2.3.4"
-	 }
-	 ]
-	 }
-	 //@param groupId
-	 //@param artifactId
+	 
 	 @return
 	 */
 	@GET
@@ -64,32 +61,47 @@ public class ModuleResource extends ApplicationSupport
 	{
 		try
 		{
-			Collection<String> versions = m_artifactMap.get(moduleName);
-
-			Release release = new Release();
-
-			for (String version : versions)
+			Repository repository = m_repositoryRegistry.getRepository(repo);
+			if (!repository.getRepositoryKind().isFacetAvailable(MavenHostedRepository.class))
 			{
-				release.addVersion(new Version(version));
+				throw new RestException(Response.Status.BAD_REQUEST, "Repository '"+repo+"' is not a maven repository.");
 			}
 
-			//Hack
+			MavenRepository mrepository = repository.adaptToFacet(MavenRepository.class);
+
+			String split[] = moduleName.split("-");
+			if (split.length != 2)
+				throw new RestException(Response.Status.BAD_REQUEST, "'"+moduleName+"' is a bad slug.");
+
+			String groupId = split[0];
+			String artifactId = split[1];
+
+			Gav gav = new Gav(groupId, artifactId, "1.0", null, "tar.gz", 	null,
+					null, null, false, null, false, null);
+
+			ArtifactStoreRequest request = new ArtifactStoreRequest(
+					mrepository, gav, true);
+			Metadata metadata = m_metadataLocator.retrieveGAMetadata(request);
+
+			if ((metadata == null)||(metadata.getVersioning() == null))
+				throw new RestException(Response.Status.NOT_FOUND, "Unable to find module '"+moduleName+"'");
+
 			StringBuilder sb = new StringBuilder();
 
 			sb.append("{\"uri\": \"/nexus/service/siesta/puppetforge/").append(repo)
 					.append("/v3/modules/")
 					.append(moduleName)
 					.append("\",\"name\":\"")
-					.append("module_name")
+					.append(moduleName)
 					.append("\",\"version\":\"")
-					.append("10.0.0") //todo: fix this
+					.append(metadata.getVersioning().getLatest())
 					.append("\",\"slug\":\"")
 					.append(moduleName)
-					.append("\",\"owner\":{\"username\":\"puppetlabs\"}")
+					.append("\",\"owner\":{\"username\":\"ZeroWing\"}")
 					.append(",\"releases\":[");
 
 			boolean first = true;
-			for (String version : versions)
+			for (String version : metadata.getVersioning().getVersions())
 			{
 				if (!first)
 					sb.append(",");
@@ -108,10 +120,26 @@ public class ModuleResource extends ApplicationSupport
 
 			return responseBuilder.build();
 		}
+		catch (RestException re)
+		{
+			StringBuilder sb = new StringBuilder();
+
+			sb.append("{\"errors\":[\"");
+			sb.append(re.getMessage());
+			sb.append("\"]}");
+
+			return Response.status(re.getStatus()).entity(sb.toString()).build();
+		}
 		catch (Exception e)
 		{
-			log.debug("Error getting modules", e);
-			return Response.status(501).build();
+			log.error("Error getting modules", e);
+			StringBuilder sb = new StringBuilder();
+
+			sb.append("{\"errors\":[\"");
+			sb.append(e.getMessage());
+			sb.append("\"]}");
+
+			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(sb.toString()).build();
 		}
 
 	}

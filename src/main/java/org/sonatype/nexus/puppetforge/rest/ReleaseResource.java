@@ -3,7 +3,6 @@ package org.sonatype.nexus.puppetforge.rest;
 import org.apache.commons.io.IOUtils;
 import org.sonatype.nexus.proxy.*;
 import org.sonatype.nexus.proxy.item.StorageFileItem;
-import org.sonatype.nexus.proxy.item.StorageItem;
 import org.sonatype.nexus.proxy.maven.ArtifactStoreRequest;
 import org.sonatype.nexus.proxy.maven.MavenRepository;
 import org.sonatype.nexus.proxy.maven.gav.Gav;
@@ -21,7 +20,6 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
-import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
 
@@ -42,11 +40,11 @@ public class ReleaseResource extends ApplicationSupport
 	implements Resource
 {
 
-	private RepositoryRegistry defaultRepositoryRegistry;
+	private RepositoryRegistry m_repositoryRegistry;
 
 	@Inject
 	public void setDefaultRepositoryRegistry(final @Named("default") RepositoryRegistry repositoryRegistry) {
-		this.defaultRepositoryRegistry = checkNotNull(repositoryRegistry);
+		this.m_repositoryRegistry = checkNotNull(repositoryRegistry);
 	}
 
 	/**
@@ -68,35 +66,48 @@ public class ReleaseResource extends ApplicationSupport
 	public Response getReleaseInfo(@PathParam("groupId") String groupId,
 			@PathParam("artifactId") String artifactId,
 			@PathParam("version") String version,
-			@PathParam("repo") String repo) throws ItemNotFoundException, IllegalOperationException, NoSuchRepositoryException, IOException, AccessDeniedException
+			@PathParam("repo") String repo)
 	{
+		try
+		{
+			StorageFileItem metadata = getMetadata(groupId, artifactId, version, repo);
 
-		StorageFileItem metadata = getMetadata(groupId, artifactId, version, repo);
+			StringWriter sw = new StringWriter();
 
-		StringWriter sw = new StringWriter();
+			IOUtils.copy(metadata.getInputStream(), sw, "UTF-8");
 
-		IOUtils.copy(metadata.getInputStream(), sw, "UTF-8");
+			StringBuilder sb = new StringBuilder();
 
-		StringBuilder sb = new StringBuilder();
+			sb.append("{\"file_uri\":\"/nexus/service/siesta/puppetforge/").append(repo).append("/v3/files/")
+					.append(groupId).append("-")
+					.append(artifactId).append("-").append(version).append(".tar.gz\"");
 
-		sb.append("{\"file_uri\":\"/nexus/service/siesta/puppetforge/").append(repo).append("/v3/files/")
-				.append(groupId).append("-")
-				.append(artifactId).append("-").append(version).append(".tar.gz\"");
+			sb.append(",\"metadata\": ")
+					.append(sw.toString());
+			sb.append(",\"deleted_at\": null");
+			sb.append("}");
 
-		sb.append(",\"metadata\": ")
-				.append(sw.toString());
-		sb.append(",\"deleted_at\": null");
-		sb.append("}");
+			Response.ResponseBuilder responseBuilder = Response.status(Response.Status.OK).entity(
+					sb.toString());
 
-		Response.ResponseBuilder responseBuilder = Response.status(Response.Status.OK).entity(
-				sb.toString());
+			return responseBuilder.build();
+		}
+		catch (Exception e)
+		{
+			log.error("Error getting releases", e);
+			StringBuilder sb = new StringBuilder();
 
-		return responseBuilder.build();
+			sb.append("{\"errors\":[\"");
+			sb.append(e.getMessage().replace('\"', '\''));
+			sb.append("\"]}");
+
+			return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(sb.toString()).build();
+		}
 	}
 
 	private StorageFileItem getMetadata(String groupId, String artifactId, String version, String repo) throws NoSuchRepositoryException, ItemNotFoundException, IllegalOperationException, StorageException, AccessDeniedException
 	{
-		Repository repository = defaultRepositoryRegistry.getRepository(repo);
+		Repository repository = m_repositoryRegistry.getRepository(repo);
 
 		MavenRepository mavenRepository = repository.adaptToFacet(MavenRepository.class);
 
