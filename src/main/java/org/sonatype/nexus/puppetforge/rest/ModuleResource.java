@@ -97,7 +97,14 @@ public class ModuleResource extends ApplicationSupport
 					.append(metadata.getVersioning().getLatest())
 					.append("\",\"slug\":\"")
 					.append(moduleName)
-					.append("\",\"owner\":{\"username\":\"ZeroWing\"}")
+					.append("\",\"owner\":{\"username\":\"")
+					.append(groupId)
+					.append("\",\"slug\":\"")
+					.append(groupId)
+					.append("\",\"uri\": \"/nexus/service/siesta/puppetforge/").append(repo)
+					.append("/v3/users/")
+					.append(groupId)
+					.append("\"}")
 					.append(",\"releases\":[");
 
 			boolean first = true;

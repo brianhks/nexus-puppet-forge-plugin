@@ -1,6 +1,7 @@
 package org.sonatype.nexus.puppetforge.rest;
 
 import org.apache.commons.io.IOUtils;
+import org.json.JSONObject;
 import org.sonatype.nexus.proxy.*;
 import org.sonatype.nexus.proxy.item.StorageFileItem;
 import org.sonatype.nexus.proxy.maven.ArtifactStoreRequest;
@@ -76,19 +77,26 @@ public class ReleaseResource extends ApplicationSupport
 
 			IOUtils.copy(metadata.getInputStream(), sw, "UTF-8");
 
-			StringBuilder sb = new StringBuilder();
+			JSONObject response = new JSONObject();
 
-			sb.append("{\"file_uri\":\"/nexus/service/siesta/puppetforge/").append(repo).append("/v3/files/")
-					.append(groupId).append("-")
-					.append(artifactId).append("-").append(version).append(".tar.gz\"");
+			response.put("file_uri", "/v3/files/" + groupId + "-" + artifactId + "-" + version + ".tar.gz");
+			response.put("slug", groupId+"-"+artifactId+"-"+version);
 
-			sb.append(",\"metadata\": ")
-					.append(sw.toString());
-			sb.append(",\"deleted_at\": null");
-			sb.append("}");
+			response.put("module", new JSONObject()
+					.put("uri", "/v3/modules/"+groupId+"-"+artifactId)
+					.put("slug", groupId+"-"+artifactId)
+					.put("name", artifactId)
+					.put("owner", new JSONObject()
+									.put("uri", "/v3/users/" + groupId)
+									.put("slug", groupId)
+									.put("username", groupId)
+					));
+
+			response.put("metadata", new JSONObject(sw.toString()));
+			response.put("deleted_at", JSONObject.NULL);
 
 			Response.ResponseBuilder responseBuilder = Response.status(Response.Status.OK).entity(
-					sb.toString());
+					response.toString());
 
 			return responseBuilder.build();
 		}
