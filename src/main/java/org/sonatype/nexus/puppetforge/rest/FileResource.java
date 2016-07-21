@@ -56,7 +56,7 @@ public class FileResource extends ApplicationSupport
 	 */
 	@GET
 	@Path("{groupId}-{artifactId}-{version}.tar.gz")
-	@Produces("application/json")
+	@Produces("application/binary")
 	public Response getReleaseInfo(@PathParam("groupId") String groupId,
 			@PathParam("artifactId") String artifactId,
 			@PathParam("version") String version,

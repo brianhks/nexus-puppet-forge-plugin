@@ -77,17 +77,19 @@ public class ReleaseResource extends ApplicationSupport
 
 			IOUtils.copy(metadata.getInputStream(), sw, "UTF-8");
 
+			String baseUri = "/nexus/service/siesta/puppetforge/"+repo;
+
 			JSONObject response = new JSONObject();
 
-			response.put("file_uri", "/v3/files/" + groupId + "-" + artifactId + "-" + version + ".tar.gz");
+			response.put("file_uri", baseUri+"/v3/files/" + groupId + "-" + artifactId + "-" + version + ".tar.gz");
 			response.put("slug", groupId+"-"+artifactId+"-"+version);
 
 			response.put("module", new JSONObject()
-					.put("uri", "/v3/modules/"+groupId+"-"+artifactId)
+					.put("uri", baseUri+"/v3/modules/"+groupId+"-"+artifactId)
 					.put("slug", groupId+"-"+artifactId)
 					.put("name", artifactId)
 					.put("owner", new JSONObject()
-									.put("uri", "/v3/users/" + groupId)
+									.put("uri", baseUri+"/v3/users/" + groupId)
 									.put("slug", groupId)
 									.put("username", groupId)
 					));

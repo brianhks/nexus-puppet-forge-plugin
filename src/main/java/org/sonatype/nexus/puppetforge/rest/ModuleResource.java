@@ -5,6 +5,9 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
 import com.google.inject.Inject;
 import org.apache.maven.artifact.repository.metadata.Metadata;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.sonatype.nexus.proxy.item.StorageFileItem;
 import org.sonatype.nexus.proxy.maven.ArtifactStoreRequest;
 import org.sonatype.nexus.proxy.maven.MavenHostedRepository;
 import org.sonatype.nexus.proxy.maven.MavenRepository;
@@ -23,7 +26,9 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -40,6 +45,7 @@ public class ModuleResource extends ApplicationSupport
 {
 	private RepositoryRegistry m_repositoryRegistry;
 	private MetadataLocator m_metadataLocator;
+	private SimpleDateFormat m_dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z");
 
 	@Inject
 	public ModuleResource(RepositoryRegistry repositoryRegistry,
@@ -67,7 +73,7 @@ public class ModuleResource extends ApplicationSupport
 				throw new RestException(Response.Status.BAD_REQUEST, "Repository '"+repo+"' is not a maven repository.");
 			}
 
-			MavenRepository mrepository = repository.adaptToFacet(MavenRepository.class);
+			MavenRepository mavenRepository = repository.adaptToFacet(MavenRepository.class);
 
 			String split[] = moduleName.split("-");
 			if (split.length != 2)
@@ -80,17 +86,33 @@ public class ModuleResource extends ApplicationSupport
 					null, null, false, null, false, null);
 
 			ArtifactStoreRequest request = new ArtifactStoreRequest(
-					mrepository, gav, true);
+					mavenRepository, gav, true);
 			Metadata metadata = m_metadataLocator.retrieveGAMetadata(request);
 
 			if ((metadata == null)||(metadata.getVersioning() == null))
 				throw new RestException(Response.Status.NOT_FOUND, "Unable to find module '"+moduleName+"'");
 
-			StringBuilder sb = new StringBuilder();
+			JSONObject response = new JSONObject();
+			JSONObject user = new JSONObject();
+			String baseUri = "/nexus/service/siesta/puppetforge/"+repo;
 
-			sb.append("{\"uri\": \"/nexus/service/siesta/puppetforge/").append(repo)
+			//StringBuilder sb = new StringBuilder();
+
+
+			user.put("username", groupId);
+			user.put("slug", groupId);
+			user.put("uri", baseUri+"/v3/users/"+groupId);
+
+			response.put("uri", baseUri+"/v3/modules/"+moduleName);
+			response.put("name", moduleName);
+			response.put("version", metadata.getVersioning().getLatest());
+			response.put("slug", moduleName);
+			response.put("owner", user);
+
+			/*sb.append("{\"uri\": \"/nexus/service/siesta/puppetforge/").append(repo)
 					.append("/v3/modules/")
 					.append(moduleName)
+
 					.append("\",\"name\":\"")
 					.append(moduleName)
 					.append("\",\"version\":\"")
@@ -105,25 +127,39 @@ public class ModuleResource extends ApplicationSupport
 					.append("/v3/users/")
 					.append(groupId)
 					.append("\"}")
-					.append(",\"releases\":[");
+					.append(",\"releases\":[");*/
 
+			JSONArray releases = new JSONArray();
 			boolean first = true;
 			for (String version : metadata.getVersioning().getVersions())
 			{
-				if (!first)
-					sb.append(",");
+				Gav releaseGav = new Gav(groupId, artifactId, version, null, "tar.gz", null, null, null, false, null, false, null);
+				ArtifactStoreRequest storeRequest = new ArtifactStoreRequest(mavenRepository,
+						releaseGav, true, false);
 
-				sb.append("{\"uri\":\"/nexus/service/siesta/puppetforge/").append(repo)
-						.append("/v3/releases/")
-						.append(moduleName).append("-").append(version)
-						.append("\",\"version\": \"").append(version).append("\"}");
-				first = false;
+				StorageFileItem storageFileItem = mavenRepository.getArtifactStoreHelper().retrieveArtifact(storeRequest);
+				Date createdDate = new Date(storageFileItem.getRepositoryItemAttributes().getCreated());
+
+
+				JSONObject release = new JSONObject();
+				release.put("uri", baseUri+"/v3/releases/"+moduleName+"-"+version);
+				release.put("file_uri", baseUri+"/v3/files"+moduleName+"-"+version+".tar.gz");
+				release.put("file_size", storageFileItem.getLength());
+				release.put("created_at", m_dateFormat.format(createdDate));
+				release.put("slug", moduleName+"-"+version);
+				release.put("deleted_at", JSONObject.NULL);
+				release.put("version", version);
+				release.put("supported", false);
+
+				releases.put(release);
 			}
 
-			sb.append("]}");
+			response.put("releases", releases);
+
+
 
 			Response.ResponseBuilder responseBuilder = Response.status(Response.Status.OK)
-					.entity(sb.toString());
+					.entity(response.toString());
 
 			return responseBuilder.build();
 		}
