@@ -34,3 +34,6 @@ forge "http://nexus:8081/nexus/service/siesta/puppetforge/puppet"
 Just replace /puppet on the end with the name of your repository.  When you call
 librarian-puppet make sure to pass --no-use-v1-api so it won't try to use version
 1 of the api which is not supported by this plugin.
+
+Updates were made to the librarian-puppet code that breaks this plugin.
+Have a look at the wiki for updated information: https://github.com/brianhks/nexus-puppet-forge-plugin/wiki
