@@ -5,6 +5,7 @@ import com.google.common.eventbus.Subscribe;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import org.apache.commons.io.IOUtils;
+import org.apache.maven.model.Dependency;
 import org.apache.maven.model.License;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.Scm;
@@ -136,6 +137,17 @@ public class EventsRouter extends ApplicationSupport
 		license.setName(metadata.getLicense());
 
 		model.setLicenses(Arrays.asList(license));
+
+		for (Metadata.Dependency dependency : metadata.getDependencies())
+		{
+			String[] depNameSplit = dependency.getName().split("/");
+			Dependency pomDep = new Dependency();
+			pomDep.setGroupId(depNameSplit[0]);
+			pomDep.setArtifactId(depNameSplit[1]);
+			pomDep.setVersion(dependency.getVersion_requirement());
+
+			model.addDependency(pomDep);
+		}
 
 		MavenXpp3Writer mavenXpp3Writer = new MavenXpp3Writer();
 
