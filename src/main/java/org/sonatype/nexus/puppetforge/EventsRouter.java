@@ -31,6 +31,7 @@ import org.sonatype.nexus.proxy.storage.UnsupportedStorageOperationException;
 import org.sonatype.nexus.proxy.walker.Walker;
 import org.sonatype.sisu.goodies.eventbus.EventBus;
 import org.sonatype.sisu.siesta.server.ApplicationSupport;
+import com.github.jknack.semver.RelationalOp;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -39,9 +40,7 @@ import javax.inject.Provider;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -52,20 +51,34 @@ import static com.google.common.base.Preconditions.checkNotNull;
 @EagerSingleton
 public class EventsRouter extends ApplicationSupport
 {
+	public static final String CONFIG_FILE = "puppet-forge.properties";
+
+
 	private Provider<RepositoryRegistry> m_repositoryRegistryProvider;
 	private NexusConfiguration m_nexusConfiguration;
 	private Gson m_gson;
+	private Set<String> m_puppetRepositories = new HashSet<String>();
 
 	@Inject
 	public EventsRouter(final Provider<RepositoryRegistry> repositoryRegistryProvider,
 			final NexusConfiguration nexusConfiguration,
-			final EventBus eventBus)
+			final EventBus eventBus) throws IOException
 	{
 		//log.info("+++++++++++++++EventRouter++++++++++++++++++++++");
 
 		m_repositoryRegistryProvider = checkNotNull(repositoryRegistryProvider);
 		checkNotNull(eventBus).register(this);
 		m_nexusConfiguration = checkNotNull(nexusConfiguration);
+
+		File configurationDirectory = m_nexusConfiguration.getConfigurationDirectory();
+		File configurations = new File(configurationDirectory, CONFIG_FILE);
+		if (configurations.exists())
+		{
+			Properties props = new Properties();
+			props.load(new FileInputStream(configurations));
+			String repoList = props.getProperty("puppet-forge.repository.list");
+			m_puppetRepositories.addAll(Arrays.asList(repoList.split(",")));
+		}
 
 		GsonBuilder builder = new GsonBuilder();
 		m_gson = builder.create();
@@ -110,6 +123,72 @@ public class EventsRouter extends ApplicationSupport
 				new FileInputStream(metadataFile), attributes);
 
 		return metadataFile;
+	}
+
+	private class RangeVersion
+	{
+		public String leftSymbol = "(";
+		public String leftVersion = "";
+		public String rightVersion = "";
+		public String rightSymbol = ")";
+
+		public String toString()
+		{
+			return (leftSymbol+leftVersion+","+rightVersion+rightSymbol);
+		}
+	}
+
+
+	private void translateRelationalOp(RelationalOp op, RangeVersion rangeVersion)
+	{
+		if (op == null)
+			return;
+		if (op instanceof RelationalOp.GreaterThan)
+		{
+			rangeVersion.leftSymbol = "]";
+			rangeVersion.leftVersion = op.getSemver().toString();
+		}
+		else if (op instanceof RelationalOp.GreatherThanEqualsTo)
+		{
+			rangeVersion.leftSymbol = "[";
+			rangeVersion.leftVersion = op.getSemver().toString();
+		}
+		else if (op instanceof RelationalOp.LessThan)
+		{
+			rangeVersion.rightSymbol = "[";
+			rangeVersion.rightVersion = op.getSemver().toString();
+		}
+		else if (op instanceof RelationalOp.LessThanEqualsTo)
+		{
+			rangeVersion.rightSymbol = "]";
+			rangeVersion.rightVersion = op.getSemver().toString();
+		}
+	}
+
+
+	private String translateVersion(String version)
+	{
+		Semver semver = Semver.create(version)
+
+		if (semver instanceof com.github.jknack.semver.Version)
+		{
+			return "${semver}"
+		}
+		else if (semver instanceof RelationalOp)
+		{
+			def rangeVersion = new RangeVersion()
+			translateRelationalOp(semver, rangeVersion)
+			return rangeVersion.toString()
+		}
+		else if (semver instanceof AndExpression)
+		{
+			def rangeVersion = new RangeVersion()
+			translateRelationalOp(semver.getLeft(), rangeVersion)
+			translateRelationalOp(semver.getRight(), rangeVersion)
+			return rangeVersion.toString()
+		}
+
+		""
 	}
 
 	private void createPom(File metadataFile, MavenRepository repository,
@@ -187,10 +266,10 @@ public class EventsRouter extends ApplicationSupport
 		String repositoryName = repository.getName();
 
 		/*
-		 Repository name must contain the word 'puppet' and it must be a Maven
+		 Repository name must be configured in puppet-forge.properties and it must be a Maven
 		 repository.
 		 */
-		if (repositoryName.toLowerCase().contains("puppet") &&
+		if (m_puppetRepositories.contains(repositoryName) &&
 				repository.getRepositoryKind().isFacetAvailable(MavenHostedRepository.class) &&
 				eventStoreItem.getName().endsWith(".tar.gz")) //todo add other conditions
 		{

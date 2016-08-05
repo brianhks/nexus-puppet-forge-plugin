@@ -16,11 +16,18 @@ of mavent 2.  Here is a sample curl statement to upload the module
 curl -v -u $NEXUS_USER:$NEXUS_PASSWORD --upload-file puppetlabs-mysql-3.6.1.tar.gz  $NEXUS_URL/nexus/content/repositories/$NEXUS_REPOSITORY/puppetlabs/mysql/3.6.1/mysql-3.6.1.tar.gz
 ```
 
-The $NEXUS_REPOSITORY name must have the word puppet in it.  This is part of what
-the plugin triggers off of to parse the module.  If the file ends with tar.gz
-and the repository has the word puppet in it this plugin will extract the metadata.json
+The $NEXUS_REPOSITORY name must be listed in the puppet-forge.repository.list property.
+If the file ends with tar.gz and the repository is configured in the properties file this plugin will extract the metadata.json
 from the tar and saves it in the same folder as the module.  The plugin will also
 parse the metadata.json file and generate a pom.xml file.
+
+To control what repositories the plugin watches for modules you must configure
+the repositories in puppet-forge.properties file.  The puppet-forge.properties file
+needs to be located in sonatype-work/nexus/conf
+
+```
+puppet-forge.repository.list=puppet,puppetModules
+```
 
 For reference look at this project I created: https://github.com/brianhks/puppet-module-publisher
 It is a set of scripts for downloading modules using librarian-puppet and then
