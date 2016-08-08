@@ -2,6 +2,7 @@ package org.sonatype.nexus.puppetforge.rest;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONObject;
+import org.sonatype.nexus.configuration.application.NexusConfiguration;
 import org.sonatype.nexus.proxy.*;
 import org.sonatype.nexus.proxy.item.StorageFileItem;
 import org.sonatype.nexus.proxy.maven.ArtifactStoreRequest;
@@ -9,6 +10,7 @@ import org.sonatype.nexus.proxy.maven.MavenRepository;
 import org.sonatype.nexus.proxy.maven.gav.Gav;
 import org.sonatype.nexus.proxy.registry.RepositoryRegistry;
 import org.sonatype.nexus.proxy.repository.Repository;
+import org.sonatype.nexus.puppetforge.Configuration;
 import org.sonatype.nexus.puppetforge.PuppetForgePlugin;
 import org.sonatype.sisu.siesta.common.Resource;
 import org.sonatype.sisu.siesta.server.ApplicationSupport;
@@ -42,6 +44,15 @@ public class ReleaseResource extends ApplicationSupport
 {
 
 	private RepositoryRegistry m_repositoryRegistry;
+	private final Configuration m_configuration;
+
+	@Inject
+	public ReleaseResource(NexusConfiguration nexusConfiguration) throws IOException
+	{
+		super();
+
+		m_configuration = Configuration.getConfigueration(nexusConfiguration);
+	}
 
 	@Inject
 	public void setDefaultRepositoryRegistry(final @Named("default") RepositoryRegistry repositoryRegistry) {
@@ -77,7 +88,9 @@ public class ReleaseResource extends ApplicationSupport
 
 			IOUtils.copy(metadata.getInputStream(), sw, "UTF-8");
 
-			String baseUri = "/nexus/service/siesta/puppetforge/"+repo;
+			String baseUri = "";
+			if (m_configuration.useReleaseFullUri())
+				baseUri = "/nexus/service/siesta/puppetforge/"+repo;
 
 			JSONObject response = new JSONObject();
 

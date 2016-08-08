@@ -1,5 +1,7 @@
 package org.sonatype.nexus.puppetforge;
 
+import com.github.jknack.semver.AndExpression;
+import com.github.jknack.semver.Semver;
 import com.google.common.eventbus.AllowConcurrentEvents;
 import com.google.common.eventbus.Subscribe;
 import com.google.gson.Gson;
@@ -70,18 +72,31 @@ public class EventsRouter extends ApplicationSupport
 		checkNotNull(eventBus).register(this);
 		m_nexusConfiguration = checkNotNull(nexusConfiguration);
 
-		File configurationDirectory = m_nexusConfiguration.getConfigurationDirectory();
-		File configurations = new File(configurationDirectory, CONFIG_FILE);
-		if (configurations.exists())
-		{
-			Properties props = new Properties();
-			props.load(new FileInputStream(configurations));
-			String repoList = props.getProperty("puppet-forge.repository.list");
-			m_puppetRepositories.addAll(Arrays.asList(repoList.split(",")));
-		}
+		Configuration configuration = Configuration.getConfigueration(nexusConfiguration);
+		m_puppetRepositories.addAll(configuration.getRepositoryList());
 
 		GsonBuilder builder = new GsonBuilder();
 		m_gson = builder.create();
+	}
+
+	private void deltree(File directory)
+	{
+		if (!directory.exists())
+			return;
+		File[] list = directory.listFiles();
+
+		if (list.length > 0)
+		{
+			for (int I = 0; I < list.length; I++)
+			{
+				if (list[I].isDirectory())
+					deltree(list[I]);
+
+				list[I].delete();
+			}
+		}
+
+		directory.delete();
 	}
 
 	private File extractMetadata(MavenRepository repository, String groupId,
@@ -90,6 +105,8 @@ public class EventsRouter extends ApplicationSupport
 		String tempFolderName = artifactId+"-"+version;
 		File extractFolder = new File(m_nexusConfiguration.getTemporaryDirectory(),
 				tempFolderName);
+
+		deltree(extractFolder);
 
 		Archiver archiver = ArchiverFactory.createArchiver(ArchiveFormat.TAR, CompressionType.GZIP);
 		log.info("Extracting to " + extractFolder.getAbsolutePath());
@@ -125,71 +142,7 @@ public class EventsRouter extends ApplicationSupport
 		return metadataFile;
 	}
 
-	private class RangeVersion
-	{
-		public String leftSymbol = "(";
-		public String leftVersion = "";
-		public String rightVersion = "";
-		public String rightSymbol = ")";
 
-		public String toString()
-		{
-			return (leftSymbol+leftVersion+","+rightVersion+rightSymbol);
-		}
-	}
-
-
-	private void translateRelationalOp(RelationalOp op, RangeVersion rangeVersion)
-	{
-		if (op == null)
-			return;
-		if (op instanceof RelationalOp.GreaterThan)
-		{
-			rangeVersion.leftSymbol = "]";
-			rangeVersion.leftVersion = op.getSemver().toString();
-		}
-		else if (op instanceof RelationalOp.GreatherThanEqualsTo)
-		{
-			rangeVersion.leftSymbol = "[";
-			rangeVersion.leftVersion = op.getSemver().toString();
-		}
-		else if (op instanceof RelationalOp.LessThan)
-		{
-			rangeVersion.rightSymbol = "[";
-			rangeVersion.rightVersion = op.getSemver().toString();
-		}
-		else if (op instanceof RelationalOp.LessThanEqualsTo)
-		{
-			rangeVersion.rightSymbol = "]";
-			rangeVersion.rightVersion = op.getSemver().toString();
-		}
-	}
-
-
-	private String translateVersion(String version)
-	{
-		Semver semver = Semver.create(version)
-
-		if (semver instanceof com.github.jknack.semver.Version)
-		{
-			return "${semver}"
-		}
-		else if (semver instanceof RelationalOp)
-		{
-			def rangeVersion = new RangeVersion()
-			translateRelationalOp(semver, rangeVersion)
-			return rangeVersion.toString()
-		}
-		else if (semver instanceof AndExpression)
-		{
-			def rangeVersion = new RangeVersion()
-			translateRelationalOp(semver.getLeft(), rangeVersion)
-			translateRelationalOp(semver.getRight(), rangeVersion)
-			return rangeVersion.toString()
-		}
-
-		""
-	}
 
 	private void createPom(File metadataFile, MavenRepository repository,
 			String groupId, String artifactId, String version) throws IOException, ItemNotFoundException, IllegalOperationException, AccessDeniedException, UnsupportedStorageOperationException
@@ -223,7 +176,7 @@ public class EventsRouter extends ApplicationSupport
 			Dependency pomDep = new Dependency();
 			pomDep.setGroupId(depNameSplit[0]);
 			pomDep.setArtifactId(depNameSplit[1]);
-			pomDep.setVersion(dependency.getVersion_requirement());
+			pomDep.setVersion(VersionTranslator.translateVersion(dependency.getVersion_requirement(), log));
 
 			model.addDependency(pomDep);
 		}
