@@ -216,13 +216,13 @@ public class EventsRouter extends ApplicationSupport
 		//log.info("|||||||||| I GOT AN EVENT |||||||||||||");
 		StorageItem eventStoreItem = eventStore.getItem();
 		Repository repository = eventStore.getRepository();
-		String repositoryName = repository.getName();
+		String repositoryId = repository.getId();
 
 		/*
 		 Repository name must be configured in puppet-forge.properties and it must be a Maven
 		 repository.
 		 */
-		if (m_puppetRepositories.contains(repositoryName) &&
+		if (m_puppetRepositories.contains(repositoryId) &&
 				repository.getRepositoryKind().isFacetAvailable(MavenHostedRepository.class) &&
 				eventStoreItem.getName().endsWith(".tar.gz")) //todo add other conditions
 		{
