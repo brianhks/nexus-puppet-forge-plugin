@@ -24,6 +24,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringWriter;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -86,7 +87,9 @@ public class ReleaseResource extends ApplicationSupport
 
 			StringWriter sw = new StringWriter();
 
-			IOUtils.copy(metadata.getInputStream(), sw, "UTF-8");
+			InputStream metadataInputStream = metadata.getInputStream();
+			IOUtils.copy(metadataInputStream, sw, "UTF-8");
+			metadataInputStream.close();
 
 			String baseUri = "";
 			if (m_configuration.useReleaseFullUri())

@@ -65,9 +65,8 @@ public class FileResource extends ApplicationSupport
 
 		StorageFileItem tarFile = getMetadata(groupId, artifactId, version, repo);
 
-
 		Response.ResponseBuilder responseBuilder = Response.status(Response.Status.OK).entity(
-				tarFile.getInputStream());
+				new StorageFileStreamingOutput(tarFile));
 
 		return responseBuilder.build();
 	}

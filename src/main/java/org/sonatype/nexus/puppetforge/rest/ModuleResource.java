@@ -109,26 +109,6 @@ public class ModuleResource extends ApplicationSupport
 			response.put("slug", moduleName);
 			response.put("owner", user);
 
-			/*sb.append("{\"uri\": \"/nexus/service/siesta/puppetforge/").append(repo)
-					.append("/v3/modules/")
-					.append(moduleName)
-
-					.append("\",\"name\":\"")
-					.append(moduleName)
-					.append("\",\"version\":\"")
-					.append(metadata.getVersioning().getLatest())
-					.append("\",\"slug\":\"")
-					.append(moduleName)
-					.append("\",\"owner\":{\"username\":\"")
-					.append(groupId)
-					.append("\",\"slug\":\"")
-					.append(groupId)
-					.append("\",\"uri\": \"/nexus/service/siesta/puppetforge/").append(repo)
-					.append("/v3/users/")
-					.append(groupId)
-					.append("\"}")
-					.append(",\"releases\":[");*/
-
 			JSONArray releases = new JSONArray();
 			boolean first = true;
 			for (String version : metadata.getVersioning().getVersions())
@@ -165,6 +145,7 @@ public class ModuleResource extends ApplicationSupport
 		}
 		catch (RestException re)
 		{
+			log.error("Error reading module resource", re);
 			StringBuilder sb = new StringBuilder();
 
 			sb.append("{\"errors\":[\"");
