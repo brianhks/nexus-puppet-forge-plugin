@@ -10,7 +10,7 @@ maven 2 repository.
 Each module must have a metadata.json file and be compressed as a tar.gz file.
 Lets say I want to upload the mysql module from puppet labs (puppetlabs-mysql-3.6.1.tar.gz),
 In order to upload the module to nexus I must conform to the naming convention 
-of mavent 2.  Here is a sample curl statement to upload the module
+of maven 2.  Here is a sample curl statement to upload the module
 
 ```
 curl -v -u $NEXUS_USER:$NEXUS_PASSWORD --upload-file puppetlabs-mysql-3.6.1.tar.gz  $NEXUS_URL/nexus/content/repositories/$NEXUS_REPOSITORY/puppetlabs/mysql/3.6.1/mysql-3.6.1.tar.gz
